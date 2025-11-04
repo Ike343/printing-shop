@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintRide - Global Printing Press</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f4f4;
+            color: #1a1a2e;
+        }
+        .hero {
+            background: linear-gradient(to right, #1a1a2e, #e74c3c);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .btn-print {
+            background-color: #e74c3c;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+        .btn-print:hover {
+            background-color: #c0392b;
+        }
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background-color: #1a1a2e;
+            border-radius: 50%;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .map-placeholder, #map {
+            height: 400px;
+            position: relative;
+        }
+        .printer-pin {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .order-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .order-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+        }
+        .status-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f4f4f4;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .status-fill {
+            height: 100%;
+            background-color: #e74c3c;
+            width: 0%;
+            transition: width 1s;
+        }
+        footer {
+            background-color: #1a1a2e;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        /* Fix: Hide map-view by default using CSS, not inline style */
+        #map-view { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landing" class="container-fluid">
+        <div class="hero">
+            <h1>PrintRide</h1>
+            <p>Print Anything, Anywhere – Stay in Your Comfort Zone</p>
+            <input type="text" id="search-input" class="form-control w-50 mx-auto mb-3" placeholder="What do you want to print? (e.g., business cards)">
+            <div class="w-50 mx-auto mb-3 text-start">
+                <label class="form-label text-white">Upload file to print</label>
+                <input type="file" id="file-input" class="form-control" title="Upload file to print" placeholder="Choose file to print">
+            </div>
+            <button class="btn btn-print" onclick="showMap()">Get Started</button>
+        </div>
+        <div class="container mt-5">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <div class="feature-icon"></div>
+                    <h3>Upload Files</h3>
+                    <p>Drag and drop your PDFs or images.</p>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-icon"></div>
+                    <h3>Find a Press</h3>
+                    <p>Locate nearby printing presses on the map.</p>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-icon"></div>
+                    <h3>Track Order</h3>
+                    <p>Monitor your print job in real-time.</p>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-icon"></div>
+                    <h3>Pickup or Deliver</h3>
+                    <p>Get it at the press or have it delivered.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Dashboard -->
+    <div id="map-view" class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div id="map"></div>
+            </div>
+            <div class="col-md-4">
+                <h4>Filters</h4>
+                <select id="speed-filter" class="form-select mb-3">
+                    <option value="express">Speed: Express</option>
+                    <option value="standard">Speed: Standard</option>
+                </select>
+                <select id="type-filter" class="form-select mb-3">
+                    <option value="flyers">Type: Flyers</option>
+                    <option value="books">Type: Books</option>
+                    <option value="tshirts">Type: T-Shirts</option>
+                </select>
+                <select id="price-filter" class="form-select mb-3">
+                    <option value="low">Price: Low to High</option>
+                    <option value="high">Price: High to Low</option>
+                </select>
+                <button id="upload-order-btn" class="btn btn-print w-100" onclick="uploadAndCreateOrder()">Upload & Create Order</button>
+                <div class="mt-3">
+                    <p><strong>Selected Press:</strong> <span id="selected-press">None</span></p>
+                    <p id="selected-distance"></p>
+                </div>
+                <div class="mt-4">
+                    <h5>Nearby Printing Presses</h5>
+                    <ul id="press-list" class="list-group" style="max-height:200px;overflow:auto;"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Confirmation Modal -->
+    <div id="order-modal" class="order-modal">
+        <div class="order-content">
+            <h4>Order Confirmation</h4>
+            <p><strong id="order-id">Order #—</strong></p>
+            <p id="order-details">Details: —</p>
+            <p>Press: <span id="order-press">None</span></p>
+            <div class="status-bar">
+                <div id="status-fill" class="status-fill"></div>
+            </div>
+            <p id="status-text">Status: —</p>
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <button class="btn btn-print" onclick="openOrderInConsole()">Open in Console</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2023 PrintRide. 10,000+ Presses Worldwide.</p>
+    </footer>
+
+    <script>
+        // Application state
+        let selectedPress = null;
+        let map, userLocation, placesService, markers = [];
+        let uploadedFileURL = null;
+        let currentOrderId = null;
+        let pressResults = [];
+        let markerMap = new Map();
+
+        function showMap() {
+            document.getElementById('landing').style.display = 'none';
+            document.getElementById('map-view').style.display = 'block';
+            loadGoogleMaps();
+        }
+
+        // Dynamic load of Google Maps JS with Places and Geometry libraries
+        function loadGoogleMaps() {
+            if (window.google && window.google.maps) { initMap(); return; }
+            const script = document.createElement('script');
+            // Replace YOUR_GOOGLE_MAPS_API_KEY with your API key. Enable Maps JavaScript API and Places API.
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAcRWEs00yd7bOtZOOvatboOoANayucYdw&libraries=places,geometry&callback=initMap';
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), { zoom: 13 });
+            placesService = new google.maps.places.PlacesService(map);
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    userLocation = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                    map.setCenter(userLocation);
+                    new google.maps.Marker({ map, position: userLocation, title: 'You' });
+                    findNearbyPresses();
+                }, () => {
+                    // Fallback location (NYC)
+                    userLocation = new google.maps.LatLng(40.7128, -74.0060);
+                    map.setCenter(userLocation);
+                    findNearbyPresses();
+                });
+            } else {
+                userLocation = new google.maps.LatLng(40.7128, -74.0060);
+                map.setCenter(userLocation);
+                findNearbyPresses();
+            }
+        }
+
+        function clearMarkers() {
+            markers.forEach(m => m.setMap(null));
+            markers = [];
+        }
+
+        function findNearbyPresses() {
+            clearMarkers();
+            pressResults = [];
+            markerMap.clear();
+            document.getElementById('press-list').innerHTML = '<li class="list-group-item">Loading...</li>';
+            const request = {
+                location: userLocation,
+                radius: 5000,
+                keyword: 'printing press'
+            };
+            placesService.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                    pressResults = results;
+                    renderPressList();
+                    results.forEach((place, idx) => {
+                        const marker = new google.maps.Marker({ map, position: place.geometry.location });
+                        marker.addListener('click', () => selectPress(place, marker, idx));
+                        markerMap.set(place.place_id, marker);
+                        markers.push(marker);
+                    });
+                } else {
+                    document.getElementById('press-list').innerHTML = '<li class="list-group-item text-danger">No presses found nearby.</li>';
+                    console.warn('Places search status:', status);
+                }
+            });
+        }
+
+        function renderPressList() {
+            const list = document.getElementById('press-list');
+            if (!pressResults.length) {
+                list.innerHTML = '<li class="list-group-item">No presses found.</li>';
+                return;
+            }
+            list.innerHTML = '';
+            pressResults.forEach((place, idx) => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item list-group-item-action';
+                li.style.cursor = 'pointer';
+                li.textContent = `${place.name} (${place.vicinity || place.formatted_address || ''})`;
+                li.onclick = () => selectPress(place, markerMap.get(place.place_id), idx);
+                if (selectedPress && selectedPress.place_id === place.place_id) {
+                    li.classList.add('active');
+                }
+                list.appendChild(li);
+            });
+        }
+
+        function selectPress(place, marker, idx) {
+            selectedPress = place;
+            document.getElementById('selected-press').textContent = place.name;
+            const distMeters = google.maps.geometry.spherical.computeDistanceBetween(userLocation, place.geometry.location);
+            document.getElementById('selected-distance').textContent = `Distance: ${(distMeters/1000).toFixed(2)} km`;
+            // Highlight marker
+            markers.forEach(m => m.setIcon(null));
+            if (marker) marker.setIcon('http://maps.google.com/mapfiles/ms/icons/red-dot.png');
+            // Highlight list
+            renderPressList();
+            // Optionally scroll to marker
+            if (marker && map && place.geometry && place.geometry.location) {
+                map.panTo(place.geometry.location);
+            }
+        }
+
+        // ---------- Firebase initialization (user must replace placeholders) ----------
+        // Replace the firebaseConfig object with your Firebase project's config.
+        // Enable Firestore and Storage in your Firebase project.
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
+            projectId: "YOUR_FIREBASE_PROJECT_ID",
+            storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
+            appId: "YOUR_FIREBASE_APP_ID"
+        };
+
+        // Load Firebase (compat SDK for simplicity)
+        function loadFirebaseAndInit() {
+            if (window.firebase) { initFirebase(); return; }
+            const s1 = document.createElement('script'); s1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'; s1.onload = () => {
+                const s2 = document.createElement('script'); s2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'; s2.onload = () => {
+                    const s3 = document.createElement('script'); s3.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js'; s3.onload = initFirebase;
+                    document.head.appendChild(s3);
+                };
+                document.head.appendChild(s2);
+            };
+            document.head.appendChild(s1);
+        }
+
+        function initFirebase() {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            window.db = firebase.firestore();
+            window.storage = firebase.storage();
+        }
+
+        // Upload file to Firebase Storage then create an order in Firestore        
+        async function uploadAndCreateOrder() {
+            if (!selectedPress) { alert('Please select a printing press on the map first.'); return; }
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files || fileInput.files.length === 0) { alert('Please choose a file to upload.'); return; }
+            loadFirebaseAndInit();
+            // wait briefly until firebase libs init
+            const waitForFirebase = () => new Promise(res => { const t = setInterval(() => { if (window.db && window.storage) { clearInterval(t); res(); } }, 100); setTimeout(() => res(), 5000); });
+            await waitForFirebase();
+
+            const file = fileInput.files[0];
+            const path = `uploads/${Date.now()}_${file.name}`;
+            const storageRef = storage.ref().child(path);
+            const uploadTask = storageRef.put(file);
+            uploadTask.on('state_changed', snapshot => {
+                // progress handling could go here
+            }, error => {
+                console.error('Upload failed', error); alert('Upload failed');
+            }, async () => {
+                uploadedFileURL = await uploadTask.snapshot.ref.getDownloadURL();
+                // create order in Firestore
+                const orderData = {
+                    pressName: selectedPress.name || 'Unknown',
+                    pressPlaceId: selectedPress.place_id || null,
+                    fileURL: uploadedFileURL,
+                    status: 'Uploaded',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    userLocation: new firebase.firestore.GeoPoint(userLocation.lat(), userLocation.lng())
+                };
+                const docRef = await db.collection('orders').add(orderData);
+                currentOrderId = docRef.id;
+                openOrderModal(orderData, currentOrderId);
+                listenOrderUpdates(currentOrderId);
+                // For demo only: simulate press updating the order. In production, the press system updates this.                
+                simulatePressUpdates(docRef);
+            });
+        }
+
+        function openOrderModal(orderData, orderId) {
+            document.getElementById('order-id').textContent = `Order #${orderId}`;
+            document.getElementById('order-details').textContent = `Details: ${document.getElementById('search-input').value || '—'}`;
+            document.getElementById('order-press').textContent = orderData.pressName;
+            document.getElementById('status-text').textContent = `Status: ${orderData.status}`;
+            document.getElementById('status-fill').style.width = '10%';
+            document.getElementById('order-modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('order-modal').style.display = 'none';
+        }
+
+        function openOrderInConsole() {
+            if (!currentOrderId) return alert('No active order');
+            window.open(`https://console.firebase.google.com/project/YOUR_FIREBASE_PROJECT_ID/firestore/data/orders/${currentOrderId}`, '_blank');
+        }
+
+        function listenOrderUpdates(orderId) {
+            if (!db) return;
+            db.collection('orders').doc(orderId).onSnapshot(doc => {
+                if (!doc.exists) return;
+                const data = doc.data();
+                document.getElementById('status-text').textContent = `Status: ${data.status}`;
+                // map some statuses to fill widths
+                const map = { 'Uploaded': '20%', 'Printing': '60%', 'Ready': '100%', 'Out for Delivery': '90%', 'Delivered': '100%' };
+                document.getElementById('status-fill').style.width = map[data.status] || '0%';
+            });
+        }
+
+        // Demo simulator: updates the Firestore order document so user can see tracking working.        
+        async function simulatePressUpdates(docRef) {
+            try {
+                // wait then set printing
+                await new Promise(r => setTimeout(r, 2000));                await docRef.update({ status: 'Printing' });                await new Promise(r => setTimeout(r, 4000));                await docRef.update({ status: 'Ready' });            } catch (e) { console.warn('Simulation stopped or failed', e); }        }
+
+        // Initialize map once Google Maps script calls the callback.
+        window.initMap = initMap;
+    </script>
+    <!-- Firebase SDKs loaded dynamically by code above. -->
+    <!-- NOTE: You MUST replace placeholders: YOUR_GOOGLE_MAPS_API_KEY and firebaseConfig values. -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!--
+    =====================
+    FIRESTORE RULES FOR TESTING (add in Firebase console > Firestore > Rules):
+    =====================
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /orders/{orderId} {
+          allow read, write: if true;
+        }
+      }
+    }
+    =====================
+    WARNING: These rules allow anyone to read/write orders. Use only for testing. Tighten before production.
+    =====================
+    -->
+</body>
+</html>
